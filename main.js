@@ -1216,15 +1216,8 @@ if(solStage&&solScene){
       const y=j*gap, ny=y/H;
       for(let i=0;i<cols;i++){
         const x=i*gap, nx=x/W;
-        // campo fluido contínuo (ondas suaves que se deslocam com o tempo/mouse)
-        const flow=0.5+0.5*(
-          Math.sin(nx*7.0 + t*1.05 + P.x*0.004)*0.5 +
-          Math.sin(ny*6.0 - t*0.85 + P.y*0.003)*0.3 +
-          Math.sin((nx+ny)*5.0 + t*0.65)*0.2);
-        // inchaço suave ao redor do cursor
-        const dx=x-P.x, dy=y-P.y;
-        const infl=Math.exp(-(dx*dx+dy*dy)*inv2s2);
-        let v=flow*0.45 + infl*0.95;
+        // campo de pontos UNIFORME (sem bojo/cursor), só com um respiro mínimo
+        let v=0.54 + 0.045*(Math.sin(nx*6.0 + t*0.5) + Math.sin(ny*5.0 - t*0.4));
         if(v>1)v=1;
         // mantém o miolo (texto) mais limpo
         const cxr=(x-W*0.5)/W, cyr=(y-H*0.42)/H;
@@ -1266,4 +1259,24 @@ if(solStage&&solScene){
       else if(raf){ cancelAnimationFrame(raf); raf=0; }
     });},{threshold:0}).observe(hero);
   }
+})();
+
+/* ===== Lazy-load do vídeo pesado: só baixa quando chega perto da viewport ===== */
+(function(){
+  const vids=document.querySelectorAll('video[data-src]');
+  if(!vids.length) return;
+  const load=v=>{
+    if(v.dataset.loaded) return;
+    v.dataset.loaded='1';
+    v.src=v.dataset.src;
+    v.load();
+    const p=v.play(); if(p&&p.catch) p.catch(()=>{});
+  };
+  if(!('IntersectionObserver' in window)){ vids.forEach(load); return; }
+  // observa a SEÇÃO (não o vídeo): o vídeo fica numa cena clipada/mascarada por
+  // animação, então o IntersectionObserver nunca o veria como visível.
+  const io=new IntersectionObserver((es,obs)=>{es.forEach(e=>{
+    if(e.isIntersecting){ load(e.target.__vid); obs.unobserve(e.target); }
+  });},{rootMargin:'600px 0px'});   // começa a baixar ~600px antes da seção aparecer
+  vids.forEach(v=>{ const anchor=v.closest('section')||v.parentElement; anchor.__vid=v; io.observe(anchor); });
 })();
