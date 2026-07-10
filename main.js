@@ -1280,3 +1280,21 @@ if(solStage&&solScene){
   });},{rootMargin:'600px 0px'});   // começa a baixar ~600px antes da seção aparecer
   vids.forEach(v=>{ const anchor=v.closest('section')||v.parentElement; anchor.__vid=v; io.observe(anchor); });
 })();
+
+/* ===== Botões de plano -> checkout do app (leva plano + ciclo selecionado) ===== */
+(function(){
+  const APP='https://app.bobestagiario.com/';
+  const links=document.querySelectorAll('[data-checkout]');
+  if(!links.length) return;
+  const period=()=>{
+    const active=document.querySelector('.pt-opt.is-active');
+    return active && active.dataset.period==='anual' ? 'anual' : 'mensal';
+  };
+  const setPeriod=(p)=>links.forEach(el=>{
+    el.href=`${APP}?plano=${el.getAttribute('data-checkout')}&ciclo=${p==='anual'?'anual':'mensal'}`;
+  });
+  setPeriod(period());
+  document.querySelectorAll('.pt-opt').forEach(btn=>btn.addEventListener('click',()=>{
+    setPeriod(btn.dataset.period);
+  },{passive:true}));
+})();
