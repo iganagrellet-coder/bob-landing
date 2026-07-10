@@ -8,6 +8,24 @@ const io=new IntersectionObserver(es=>{
 },{threshold:.16,rootMargin:'0px 0px -6% 0px'});
 document.querySelectorAll('.reveal,.watch').forEach(el=>{if(!el.closest('.feat-block'))io.observe(el);});
 
+/* ===== mobile: animação padrão das features (fade + sobe, em cascata) =====
+   usada pelas cenas com PIN (que no desktop têm animação própria) para que no
+   mobile todas revelem igual ao bloco Pagamentos. */
+function mobFeatProg(el){
+  const vh=innerHeight||document.documentElement.clientHeight;
+  const top=el.getBoundingClientRect().top;
+  return Math.max(0,Math.min(1,(vh*0.85 - top)/(vh*0.55)));
+}
+function mobFeatReveal(items,p){
+  items.forEach((el,i)=>{
+    if(!el)return;
+    const t=Math.max(0,Math.min(1,(p-i*0.07)/0.5));
+    const e=1-Math.pow(1-t,3);
+    el.style.opacity=String(e);
+    el.style.transform=`translateY(${((1-e)*28).toFixed(1)}px)`;
+  });
+}
+
 /* ===== Features reativas à rolagem: progride ao descer, retrocede ao subir ===== */
 (function(){
   const blocks=[...document.querySelectorAll('.feat-block')].filter(b=>b.id!=='vendas');
@@ -238,6 +256,16 @@ if(dorScroll&&dorGrid){
 
   const setReveal=n=>{cards.forEach((c,i)=>c.classList.toggle('shown',i<n));};
 
+  // mobile: revela os cards progressivamente ao entrarem na viewport (fade + sobe)
+  let dorIO=null;
+  const mobileReveal=()=>{
+    if(dorIO)return;
+    if(!('IntersectionObserver' in window)){showAll();return;}
+    dorIO=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('shown');dorIO.unobserve(e.target);}});},{threshold:0.16,rootMargin:'0px 0px -8% 0px'});
+    cards.forEach(c=>dorIO.observe(c));
+  };
+  const stopMobileReveal=()=>{if(dorIO){dorIO.disconnect();dorIO=null;}};
+
   const setPile=q=>{
     const cq=clamp01(q);
     const eq=easeInOut(cq);
@@ -286,7 +314,17 @@ if(dorScroll&&dorGrid){
   };
 
   const update=()=>{
-    if(reduce||!desktop.matches){showAll();return;}
+    if(reduce){stopMobileReveal();showAll();return;}
+    if(!desktop.matches){                          // mobile: reveal progressivo via IO
+      mobileReveal();
+      // a frase (grifo + letras) fica sempre totalmente visível no mobile
+      if(phrase){phrase.style.opacity='';phrase.style.transform='';}
+      if(ph1){ph1.style.opacity='';ph1.style.transform='';}
+      if(ph2){ph2.style.opacity='';}
+      chars.forEach(s=>s.classList.add('lit'));
+      return;
+    }
+    stopMobileReveal();
     const vh=innerHeight||document.documentElement.clientHeight;
     const scrolled=(scrollY||pageYOffset)-dorScroll.offsetTop;
     // fase reveal: 1º card aparece cedo; depois um intervalo GRANDE entre cada um
@@ -328,7 +366,11 @@ if(solStage&&solScene){
       const ws=document.createElement('span');ws.className='tw';
       [...w].forEach(ch=>{const cs=document.createElement('span');cs.className='tc';cs.textContent=ch;ws.appendChild(cs);tchars.push(cs);});
       solTitle.appendChild(ws);
-      if(wi<words.length-1) solTitle.appendChild(wi===4 ? document.createElement('br') : document.createTextNode(' '));
+      if(wi<words.length-1){
+        solTitle.appendChild(document.createTextNode(' '));
+        if(wi===4){const b=document.createElement('br');b.className='br-d';solTitle.appendChild(b);}         // desktop: 2 linhas
+        if(wi===2||wi===5){const b=document.createElement('br');b.className='br-m';solTitle.appendChild(b);} // mobile: 3 linhas
+      }
     });
   }
   // "Prazer, esse é o Bob.": frase da cena, digita depois do vídeo aparecer
@@ -349,7 +391,18 @@ if(solStage&&solScene){
   }
   const setClip=r=>{const v=(r==null)?'none':`circle(${r}px at 50% 100%)`;solScene.style.clipPath=v;solScene.style.webkitClipPath=v;};
   const updS=()=>{
-    if(redS||!deskS.matches){setClip(null);tchars.forEach(s=>s.classList.add('lit'));pchars.forEach(s=>s.classList.add('typed'));return;}
+    if(redS){setClip(null);tchars.forEach(s=>s.classList.add('lit'));pchars.forEach(s=>s.classList.add('typed'));return;}
+    if(!deskS.matches){
+      // mobile: a cena do Bob fica visível; o título "escreve" conforme entra na viewport
+      setClip(null);
+      pchars.forEach(s=>s.classList.add('typed'));
+      const vhm=innerHeight||document.documentElement.clientHeight;
+      const topm=solStage.getBoundingClientRect().top;
+      const pm=clS((vhm*0.82 - topm)/(vhm*0.5));
+      const nm=Math.round(pm*tchars.length);
+      tchars.forEach((s,i)=>s.classList.toggle('lit', i<nm));
+      return;
+    }
     const vh=innerHeight||document.documentElement.clientHeight;
     const vw=innerWidth||document.documentElement.clientWidth;
     const scrolled=-solStage.getBoundingClientRect().top;
@@ -405,10 +458,10 @@ if(solStage&&solScene){
   function apply(p){
     if(!desk.matches){                       // mobile: sem deslocamento lateral
       ui.style.transform='none'; ui.style.opacity='1'; card.style.transform='none';
-      rows.forEach((el,i)=>{const t=cl((p-0.06-i*0.12)/0.26);el.style.opacity=cl(t*1.6);el.style.transform=`translateY(${(1-back(t))*-30}px)`;});
-      txt.forEach((el,i)=>{const lp=ease(cl((p-0.5-i*0.05)/0.4));el.style.opacity=lp;el.style.transform=`translateY(${(1-lp)*24}px)`;});
-      if(bubble){const bp=ease(cl((p-0.8)/0.2));bubble.style.opacity=bp;bubble.style.transform=`translateY(${(1-bp)*10}px)`;}
-      block.classList.toggle('lit', p>0.5);
+      txt.forEach((el,i)=>{const lp=ease(cl((p-0.08-i*0.05)/0.30));el.style.opacity=lp;el.style.transform=`translateY(${(1-lp)*24}px)`;});
+      rows.forEach((el,i)=>{const t=cl((p-0.30-i*0.10)/0.26);el.style.opacity=cl(t*1.6);el.style.transform=`translateY(${(1-back(t))*-30}px)`;});
+      if(bubble){const bp=ease(cl((p-0.72)/0.2));bubble.style.opacity=bp;bubble.style.transform=`translateY(${(1-bp)*10}px)`;}
+      block.classList.toggle('lit', p>0.4);
       return;
     }
     const RIGHT=rightShift();
@@ -660,7 +713,8 @@ if(solStage&&solScene){
     if(ticking)return; ticking=true;
     requestAnimationFrame(()=>{
       ticking=false;
-      if(!desk.matches||reduce.matches){finalState();return;}
+      if(reduce.matches){finalState();return;}
+      if(!desk.matches){finalState();mobFeatReveal([ui,...txt,...rows],mobFeatProg(track));return;}
       const rectTop=track.getBoundingClientRect().top;
       if(Math.abs(rectTop-lp)<1)return; lp=rectTop; apply(rectTop);
     });
@@ -720,7 +774,8 @@ if(solStage&&solScene){
     if(ticking)return; ticking=true;
     requestAnimationFrame(()=>{
       ticking=false;
-      if(reduce.matches||!desk.matches){finalState();return;}
+      if(reduce.matches){finalState();return;}
+      if(!desk.matches){finalState();mobFeatReveal([ui,...txt,...cols],mobFeatProg(block));return;}
       const vh=innerHeight||document.documentElement.clientHeight;
       const r=block.getBoundingClientRect();
       if(r.bottom<-80||r.top>vh+80){const p=r.top>vh?0:1;if(lp!==p){lp=p;apply(p);}return;}
@@ -789,7 +844,8 @@ if(solStage&&solScene){
     if(ticking)return; ticking=true;
     requestAnimationFrame(()=>{
       ticking=false;
-      if(!desk.matches||reduce.matches){finalState();return;}
+      if(reduce.matches){finalState();return;}
+      if(!desk.matches){finalState();mobFeatReveal([ui,...txt,...events],mobFeatProg(block));return;}
       const rectTop=block.getBoundingClientRect().top;
       if(Math.abs(rectTop-lp)<1)return; lp=rectTop; apply(rectTop);
     });
@@ -837,7 +893,8 @@ if(solStage&&solScene){
     requestAnimationFrame(()=>{
       ticking=false;
       const vh=innerHeight||document.documentElement.clientHeight;
-      if(!desk.matches||reduce.matches){finalState();return;}
+      if(reduce.matches){finalState();return;}
+      if(!desk.matches){finalState();mobFeatReveal([ui,...txt],mobFeatProg(track));return;}
       const rect=track.getBoundingClientRect();
       const len=Math.max(1, track.offsetHeight - vh);
       const p=cl((-rect.top)/len);
@@ -990,12 +1047,24 @@ if(solStage&&solScene){
   function finalState(){
     cards.forEach((c,i)=>{c.style.opacity='';c.style.transform='';c.classList.add('up');if(icons[i])icons[i].classList.remove('pf-pop');settled[i]=true;});
   }
+  // mobile: cada card aparece por vez ao entrar na viewport (fade + sobe)
+  let proIO=null;
+  function mobileReveal(){
+    if(proIO)return;
+    if(!('IntersectionObserver' in window)){finalState();return;}
+    cards.forEach(c=>{c.style.opacity='';c.style.transform='';c.classList.remove('up');});
+    proIO=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('up');proIO.unobserve(e.target);}});},{threshold:0.2,rootMargin:'0px 0px -10% 0px'});
+    cards.forEach(c=>proIO.observe(c));
+  }
+  function stopMobileReveal(){if(proIO){proIO.disconnect();proIO=null;}}
   let ticking=false, lp=-2;
   function onScroll(){
     if(ticking)return; ticking=true;
     requestAnimationFrame(()=>{
       ticking=false;
-      if(!desk.matches||reduce.matches){finalState();return;}
+      if(reduce.matches){stopMobileReveal();finalState();return;}
+      if(!desk.matches){mobileReveal();return;}
+      stopMobileReveal();
       const vh=innerHeight||document.documentElement.clientHeight;
       const p=cl((-track.getBoundingClientRect().top)/Math.max(1,track.offsetHeight-vh));
       if(Math.abs(p-lp)<0.001)return; lp=p; apply(p);
@@ -1101,4 +1170,100 @@ if(solStage&&solScene){
     e.preventDefault();
     scrollTo({top:targetY(),behavior:'smooth'});
   }));
+})();
+
+
+/* ===== Hero: fundo halftone dinâmico (campo fluido contínuo + reação ao mouse).
+   Pontos crescem/diminuem por um campo animado; perto do cursor eles incham e o
+   "fluido" segue o mouse com atraso suave. Sem mouse, deriva sozinho (vivo). ===== */
+(function(){
+  const hero=document.querySelector('.hero');
+  const cv=hero&&hero.querySelector('.hero-fx');
+  if(!cv) return;
+  const ctx=cv.getContext('2d');
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let W=0,H=0,dpr=1,cols=0,rows=0,gap=17,maxR=2.5,sigma=200,inv2s2=1;
+  const P={x:0,y:0,tx:0,ty:0,active:false};
+  let idleT=0;
+
+  function resize(){
+    const r=hero.getBoundingClientRect();
+    W=r.width; H=r.height;
+    dpr=Math.min(devicePixelRatio||1,2);
+    cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    gap = W<600 ? 15 : 17;
+    maxR = W<600 ? 1.9 : 2.5;
+    cols=Math.ceil(W/gap)+1; rows=Math.ceil(H/gap)+1;
+    sigma=Math.max(120,Math.min(W,H)*0.30); inv2s2=1/(2*sigma*sigma);
+    if(!P.active){P.x=P.tx=W*0.5; P.y=P.ty=H*0.42;}
+  }
+  addEventListener('resize',resize,{passive:true});
+  resize();
+
+  addEventListener('pointermove',e=>{
+    const r=hero.getBoundingClientRect();
+    P.tx=e.clientX-r.left; P.ty=e.clientY-r.top;
+    P.active=true; clearTimeout(idleT);
+    idleT=setTimeout(()=>{P.active=false;},2600);   // volta a derivar sozinho
+  },{passive:true});
+
+  let t=0;
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#111';
+    for(let j=0;j<rows;j++){
+      const y=j*gap, ny=y/H;
+      for(let i=0;i<cols;i++){
+        const x=i*gap, nx=x/W;
+        // campo fluido contínuo (ondas suaves que se deslocam com o tempo/mouse)
+        const flow=0.5+0.5*(
+          Math.sin(nx*7.0 + t*1.05 + P.x*0.004)*0.5 +
+          Math.sin(ny*6.0 - t*0.85 + P.y*0.003)*0.3 +
+          Math.sin((nx+ny)*5.0 + t*0.65)*0.2);
+        // inchaço suave ao redor do cursor
+        const dx=x-P.x, dy=y-P.y;
+        const infl=Math.exp(-(dx*dx+dy*dy)*inv2s2);
+        let v=flow*0.45 + infl*0.95;
+        if(v>1)v=1;
+        // mantém o miolo (texto) mais limpo
+        const cxr=(x-W*0.5)/W, cyr=(y-H*0.42)/H;
+        const cd=Math.sqrt(cxr*cxr+cyr*cyr);
+        const clean=Math.min(1,Math.max(0,(cd-0.13)/0.34));
+        v*=(0.22+0.78*clean);
+        const rr=v*maxR;
+        if(rr<0.32) continue;
+        let a=0.05+v*0.32; if(a>0.46)a=0.46;
+        ctx.globalAlpha=a;
+        ctx.beginPath();
+        ctx.arc(x,y,rr,0,6.2832);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha=1;
+  }
+
+  let raf=0;
+  function loop(){
+    t+=0.006;
+    if(!P.active){                       // deriva num lissajous lento (vivo sem mouse)
+      P.tx=W*(0.5+0.30*Math.sin(t*0.62));
+      P.ty=H*(0.44+0.28*Math.cos(t*0.5));
+    }
+    P.x+=(P.tx-P.x)*0.055;               // atraso fluido seguindo o alvo
+    P.y+=(P.ty-P.y)*0.055;
+    draw();
+    raf=requestAnimationFrame(loop);
+  }
+
+  if(reduce){ t=1.6; P.active=false; P.tx=W*0.32; P.ty=H*0.7; P.x=P.tx; P.y=P.ty; draw(); }
+  else { loop(); }
+
+  // pausa quando a hero sai da tela (economia)
+  if('IntersectionObserver' in window && !reduce){
+    new IntersectionObserver(es=>{es.forEach(e=>{
+      if(e.isIntersecting){ if(!raf) loop(); }
+      else if(raf){ cancelAnimationFrame(raf); raf=0; }
+    });},{threshold:0}).observe(hero);
+  }
 })();

@@ -32,15 +32,23 @@ Conteúdo:
 ### 3) Ligar o domínio
 1. No projeto → **Settings → Domains** → adicione **`bobestagiario.com`** e **`www.bobestagiario.com`**
    (deixe o `www` redirecionando para o domínio principal).
-2. No seu painel de **DNS** (mesmo lugar onde está `app.bobestagiario.com`), crie:
+2. No seu painel de **DNS no GoDaddy** (mesmo lugar onde está `app.bobestagiario.com`):
+   **use o valor que a Vercel mostrar na sua tela.** Hoje ela pede o IP novo:
 
-   | Host | Tipo | Valor |
-   |------|------|-------|
-   | `@` (bobestagiario.com) | **A** | `76.76.21.21` |
-   | `www` | **CNAME** | `cname.vercel-dns.com` |
+   | Host / Name | Tipo | Valor |
+   |-------------|------|-------|
+   | `@` (bobestagiario.com) | **A** | `216.198.79.1` *(ou o que a Vercel exibir)* |
+   | `www` (só se adicionou `www`) | **CNAME** | `cname.vercel-dns.com` |
 
-   - **Não mexa** no registro `app` (o app continua funcionando em `app.bobestagiario.com`).
-   - A Vercel mostra os valores exatos ao adicionar o domínio; se diferirem, use os que ela indicar.
+   Passo a passo no GoDaddy:
+   - GoDaddy → **My Products** → em `bobestagiario.com` → **DNS**.
+   - Ache o registro **A** com Nome **`@`** → **Editar (lápis)** → troque o Valor para
+     **`216.198.79.1`** → **Salvar**. (Se não existir, **Add New Record** → A · @ · 216.198.79.1.)
+   - (Opcional) **Add New Record** → **CNAME** · `www` · `cname.vercel-dns.com`.
+   - **Não mexa** no registro `app` (o app continua em `app.bobestagiario.com`).
+   - Se continuar inválido, confira em **Forwarding/Encaminhamento** do GoDaddy se há
+     redirecionamento ligado e **desligue**.
+   - O antigo `76.76.21.21` também funciona, mas prefira o valor que a Vercel exibe.
 3. Em alguns minutos a Vercel emite o **HTTPS (cadeado)** automaticamente e
    **bobestagiario.com** já abre a landing.
 
