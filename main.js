@@ -1239,7 +1239,7 @@ if(solStage&&solScene){
     if(eng<0.001)eng=0;
 
     ctx.clearRect(0,0,W,H);
-    ctx.fillStyle='#111';           // pontos pretos
+    ctx.fillStyle='#8a8a8a';        // pontos cinza (mais claros)
     ctx.globalAlpha=DOT_ALPHA;      // discretos sobre o fundo claro
     ctx.beginPath();
     const len=dots.length, rad=DOT_DRAW;
