@@ -1173,83 +1173,101 @@ if(solStage&&solScene){
 })();
 
 
-/* ===== Hero: fundo halftone dinâmico (campo fluido contínuo + reação ao mouse).
-   Pontos crescem/diminuem por um campo animado; perto do cursor eles incham e o
-   "fluido" segue o mouse com atraso suave. Sem mouse, deriva sozinho (vivo). ===== */
+/* ===== Hero: DotField (porta vanilla do componente React "DotField", ReactBits).
+   Mesma dinâmica: grade de pontos que "incham"/afastam do cursor, com engajamento
+   proporcional à VELOCIDADE do mouse (bulge). Fundo branco, pontos pretos — sem cor
+   e sem o glow escuro (era ele que deixava o fundo escuro na referência). ===== */
 (function(){
   const hero=document.querySelector('.hero');
   const cv=hero&&hero.querySelector('.hero-fx');
   if(!cv) return;
-  const ctx=cv.getContext('2d');
+  const ctx=cv.getContext('2d',{alpha:true});
   const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
-  let W=0,H=0,dpr=1,cols=0,rows=0,gap=17,maxR=2.5,sigma=200,inv2s2=1;
-  const P={x:0,y:0,tx:0,ty:0,active:false};
-  let idleT=0;
+  const dpr=Math.min(devicePixelRatio||1,2);
 
+  // equivalentes às props do componente (bulgeOnly, sparkle/wave off)
+  let DOT_SPACING=14, DOT_DRAW=1.15, CURSOR_RADIUS=500, BULGE=70, DOT_ALPHA=0.5;
+  const step=()=>DOT_SPACING+1.5;   // dotRadius(1.5)+spacing, como na referência
+
+  let W=0,H=0,dots=[],raf=0,frame=0,eng=0;
+  const m={x:-9999,y:-9999,px:-9999,py:-9999,speed:0};
+
+  function build(){
+    const s=step();
+    const cols=Math.floor(W/s), rows=Math.floor(H/s);
+    const padX=(W%s)/2, padY=(H%s)/2;
+    dots=new Array(cols*rows); let k=0;
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+      const ax=padX+c*s+s/2, ay=padY+r*s+s/2;
+      dots[k++]={ax,ay,sx:ax,sy:ay};
+    }
+  }
   function resize(){
     const r=hero.getBoundingClientRect();
     W=r.width; H=r.height;
-    dpr=Math.min(devicePixelRatio||1,2);
     cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+    cv.style.width=W+'px'; cv.style.height=H+'px';
     ctx.setTransform(dpr,0,0,dpr,0,0);
-    gap = W<600 ? 15 : 17;
-    maxR = W<600 ? 1.9 : 2.5;
-    cols=Math.ceil(W/gap)+1; rows=Math.ceil(H/gap)+1;
-    sigma=Math.max(120,Math.min(W,H)*0.30); inv2s2=1/(2*sigma*sigma);
-    if(!P.active){P.x=P.tx=W*0.5; P.y=P.ty=H*0.42;}
+    // afina um pouco no mobile
+    DOT_SPACING = W<600 ? 13 : 14;
+    DOT_DRAW    = W<600 ? 1.0 : 1.15;
+    build();
   }
-  addEventListener('resize',resize,{passive:true});
+  let rzT; addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(resize,100);},{passive:true});
   resize();
 
   addEventListener('pointermove',e=>{
     const r=hero.getBoundingClientRect();
-    P.tx=e.clientX-r.left; P.ty=e.clientY-r.top;
-    P.active=true; clearTimeout(idleT);
-    idleT=setTimeout(()=>{P.active=false;},2600);   // volta a derivar sozinho
+    m.x=e.clientX-r.left; m.y=e.clientY-r.top;
   },{passive:true});
 
-  let t=0;
+  // velocidade do mouse suavizada (mesmo esquema do componente: intervalo dedicado)
+  const speedIv=setInterval(()=>{
+    const dx=m.px-m.x, dy=m.py-m.y;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    m.speed+=(d-m.speed)*0.5;
+    if(m.speed<0.001)m.speed=0;
+    m.px=m.x; m.py=m.y;
+  },20);
+
   function draw(){
+    frame++;
+    const crSq=CURSOR_RADIUS*CURSOR_RADIUS;
+    // engajamento = quão rápido o mouse se move (0..1), suavizado
+    const target=Math.min(m.speed/5,1);
+    eng+=(target-eng)*0.06;
+    if(eng<0.001)eng=0;
+
     ctx.clearRect(0,0,W,H);
-    ctx.fillStyle='#111';
-    for(let j=0;j<rows;j++){
-      const y=j*gap, ny=y/H;
-      for(let i=0;i<cols;i++){
-        const x=i*gap, nx=x/W;
-        // campo de pontos UNIFORME (sem bojo/cursor), só com um respiro mínimo
-        let v=0.54 + 0.045*(Math.sin(nx*6.0 + t*0.5) + Math.sin(ny*5.0 - t*0.4));
-        if(v>1)v=1;
-        // mantém o miolo (texto) mais limpo
-        const cxr=(x-W*0.5)/W, cyr=(y-H*0.42)/H;
-        const cd=Math.sqrt(cxr*cxr+cyr*cyr);
-        const clean=Math.min(1,Math.max(0,(cd-0.13)/0.34));
-        v*=(0.22+0.78*clean);
-        const rr=v*maxR;
-        if(rr<0.32) continue;
-        let a=0.05+v*0.32; if(a>0.46)a=0.46;
-        ctx.globalAlpha=a;
-        ctx.beginPath();
-        ctx.arc(x,y,rr,0,6.2832);
-        ctx.fill();
+    ctx.fillStyle='#111';           // pontos pretos
+    ctx.globalAlpha=DOT_ALPHA;      // discretos sobre o fundo claro
+    ctx.beginPath();
+    const len=dots.length, rad=DOT_DRAW;
+    for(let i=0;i<len;i++){
+      const d=dots[i];
+      const dx=m.x-d.ax, dy=m.y-d.ay;
+      const distSq=dx*dx+dy*dy;
+      if(distSq<crSq && eng>0.01){
+        const dist=Math.sqrt(distSq);
+        const tt=1-dist/CURSOR_RADIUS;
+        const push=tt*tt*BULGE*eng;   // afasta do cursor (bulge)
+        const ang=Math.atan2(dy,dx);
+        d.sx+=(d.ax-Math.cos(ang)*push-d.sx)*0.15;
+        d.sy+=(d.ay-Math.sin(ang)*push-d.sy)*0.15;
+      } else {
+        d.sx+=(d.ax-d.sx)*0.1;        // volta suave ao lugar
+        d.sy+=(d.ay-d.sy)*0.1;
       }
+      ctx.moveTo(d.sx+rad,d.sy);
+      ctx.arc(d.sx,d.sy,rad,0,6.2832);
     }
+    ctx.fill();
     ctx.globalAlpha=1;
   }
 
-  let raf=0;
-  function loop(){
-    t+=0.006;
-    if(!P.active){                       // deriva num lissajous lento (vivo sem mouse)
-      P.tx=W*(0.5+0.30*Math.sin(t*0.62));
-      P.ty=H*(0.44+0.28*Math.cos(t*0.5));
-    }
-    P.x+=(P.tx-P.x)*0.055;               // atraso fluido seguindo o alvo
-    P.y+=(P.ty-P.y)*0.055;
-    draw();
-    raf=requestAnimationFrame(loop);
-  }
+  function loop(){ draw(); raf=requestAnimationFrame(loop); }
 
-  if(reduce){ t=1.6; P.active=false; P.tx=W*0.32; P.ty=H*0.7; P.x=P.tx; P.y=P.ty; draw(); }
+  if(reduce){ draw(); }           // grade estática (sem animação)
   else { loop(); }
 
   // pausa quando a hero sai da tela (economia)
@@ -1279,6 +1297,82 @@ if(solStage&&solScene){
     if(e.isIntersecting){ load(e.target.__vid); obs.unobserve(e.target); }
   });},{rootMargin:'600px 0px'});   // começa a baixar ~600px antes da seção aparecer
   vids.forEach(v=>{ const anchor=v.closest('section')||v.parentElement; anchor.__vid=v; io.observe(anchor); });
+})();
+
+/* ===== Menu mobile (drawer preto) ===== */
+(function(){
+  const burger=document.getElementById('navBurger');
+  const menu=document.getElementById('mobileMenu');
+  if(!burger||!menu) return;
+  const open=()=>{menu.classList.add('open');menu.setAttribute('aria-hidden','false');burger.setAttribute('aria-expanded','true');document.body.classList.add('menu-open');};
+  const close=()=>{menu.classList.remove('open');menu.setAttribute('aria-hidden','true');burger.setAttribute('aria-expanded','false');document.body.classList.remove('menu-open');};
+  burger.addEventListener('click',()=>menu.classList.contains('open')?close():open());
+  menu.querySelectorAll('[data-mclose]').forEach(el=>el.addEventListener('click',close));
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menu.classList.contains('open'))close();});
+  // fecha se a tela crescer pro desktop
+  matchMedia('(min-width:821px)').addEventListener('change',e=>{if(e.matches)close();});
+})();
+
+/* ===== Segurança: os dados do cofre se criptografam e o cadeado fecha ===== */
+(function(){
+  const vault=document.querySelector('.vault');
+  if(!vault) return;
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const rows=[...vault.querySelectorAll('.vault-row')];
+  const GLYPHS='#%&*+=?<>/89320abkxz';
+  const maskChar='•';
+  const maskOf=(s)=>s.replace(/[^\s]/g,maskChar);
+
+  function finishAll(){
+    rows.forEach(r=>{
+      const v=r.querySelector('.vault-value');
+      v.textContent=maskOf(v.dataset.plain||v.textContent);
+      r.classList.add('masked');
+    });
+    vault.classList.add('locked');
+  }
+
+  function scrambleRow(row,done){
+    const el=row.querySelector('.vault-value');
+    const plain=el.dataset.plain||el.textContent;
+    let head=0;                                  // até onde já virou máscara
+    const total=plain.length;
+    const t=setInterval(()=>{
+      head++;
+      let out='';
+      for(let i=0;i<total;i++){
+        const ch=plain[i];
+        if(ch===' '){out+=' ';continue}
+        if(i<head) out+=maskChar;                                    // já criptografado
+        else if(i<head+2) out+=GLYPHS[(Math.random()*GLYPHS.length)|0]; // fronteira embaralhando
+        else out+=ch;                                                // ainda legível
+      }
+      el.textContent=out;
+      if(head>=total+1){
+        clearInterval(t);
+        el.textContent=maskOf(plain);
+        row.classList.add('masked');
+        done&&done();
+      }
+    },34);
+  }
+
+  if(reduce){ finishAll(); return; }             // sem animação: já protegido
+
+  let played=false;
+  new IntersectionObserver((es,obs)=>{es.forEach(e=>{
+    if(!e.isIntersecting||played) return;
+    played=true; obs.disconnect();
+    setTimeout(()=>{
+      let i=0;
+      const next=()=>{
+        if(i>=rows.length){ setTimeout(()=>vault.classList.add('locked'),180); return; }
+        const row=rows[i++];
+        scrambleRow(row,()=>setTimeout(next,120));
+      };
+      next();
+    },450);                                      // respiro depois que o card aparece
+  });},{threshold:.45}).observe(vault);
 })();
 
 /* ===== Botões de plano -> checkout do app (leva plano + ciclo selecionado) ===== */
