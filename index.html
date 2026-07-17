@@ -9,6 +9,46 @@
 <script>
 !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init capture register register_once register_for_session unregister unregister_for_session getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey getNextSurveyStep identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty createPersonProfile opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing debug getPageViewId captureTraceFeedback captureTraceMetric".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
 try{posthog.init('phc_vSK6i53xepBDTYHvXJV9jeZe9XSozV9mQvAnHgtNFQot',{api_host:'https://eu.i.posthog.com',person_profiles:'identified_only',autocapture:true,capture_pageview:true,capture_exceptions:true,disable_session_recording:true});}catch(e){}
+// Tráfego interno: ?bobtrack=off desliga a análise NESTE navegador (e ?bobtrack=on religa). Fica gravado.
+try{var _q=new URLSearchParams(location.search||"");if(_q.get("bobtrack")==="off")localStorage.setItem("bob_optout","1");if(_q.get("bobtrack")==="on")localStorage.removeItem("bob_optout");if(localStorage.getItem("bob_optout")==="1"){if(posthog.opt_out_capturing)posthog.opt_out_capturing();}else if(posthog.opt_in_capturing){posthog.opt_in_capturing();}}catch(e){}
+// Funil: nomeia cliques dos botões (landing_click) e marca até onde a pessoa rolou (landing_section).
+try{
+document.addEventListener("click",function(ev){
+  try{
+    var a=ev.target&&ev.target.closest?ev.target.closest("a"):null;
+    if(!a)return;
+    var name=null;
+    if(a.matches("[data-checkout='bob']"))name="Plano Bob (ir pro checkout)";
+    else if(a.matches("[data-checkout='pro']"))name="Plano Bob Pro (ir pro checkout)";
+    else if(a.matches(".nav-login,.mmenu-login"))name="Login";
+    else if(a.matches(".nav-cta,.nav-cta-m,.mmenu-cta"))name="Começar teste grátis (topo)";
+    else if(a.closest(".hero-ctas"))name="Começar teste grátis (herói)";
+    else if(a.closest(".cta-final"))name="Escolher meu plano (final)";
+    else if(a.matches("a.btn")&&(a.getAttribute("href")||"")==="#planos")name="Começar com o Bob (rodapé)";
+    if(name&&window.posthog&&posthog.capture)posthog.capture("landing_click",{button:name});
+  }catch(e){}
+},true);
+window.addEventListener("load",function(){
+  try{
+    var ids=["dor","solucao","bob","features","app-intro","pro","seguranca","planos","depoimentos","faq"];
+    var seen={};
+    var els=ids.map(function(id){return document.getElementById(id);}).filter(Boolean);
+    var fim=document.querySelector(".cta-final");if(fim){fim.setAttribute("data-sec","cta-final");els.push(fim);}
+    if(!("IntersectionObserver" in window)||!els.length)return;
+    // Dispara quando a seção cruza a faixa central da tela (funciona até para
+    // seções mais altas que a janela, onde um % fixo nunca seria atingido).
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(!en.isIntersecting)return;
+        var key=en.target.id||en.target.getAttribute("data-sec");
+        if(!key||seen[key])return;seen[key]=1;
+        if(window.posthog&&posthog.capture)posthog.capture("landing_section",{section:key});
+      });
+    },{threshold:0,rootMargin:"-35% 0px -35% 0px"});
+    els.forEach(function(el){io.observe(el);});
+  }catch(e){}
+});
+}catch(e){}
 </script>
 <link rel="preconnect" href="https://rsms.me/">
 <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
