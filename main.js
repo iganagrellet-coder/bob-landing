@@ -393,14 +393,9 @@ if(solStage&&solScene){
   const updS=()=>{
     if(redS){setClip(null);tchars.forEach(s=>s.classList.add('lit'));pchars.forEach(s=>s.classList.add('typed'));return;}
     if(!deskS.matches){
-      // mobile: a cena do Bob fica visível; o título "escreve" conforme entra na viewport
+      // mobile: a cena do Bob fica visível; o título anima sozinho (ver typeTitle abaixo)
       setClip(null);
       pchars.forEach(s=>s.classList.add('typed'));
-      const vhm=innerHeight||document.documentElement.clientHeight;
-      const topm=solStage.getBoundingClientRect().top;
-      const pm=clS((vhm*0.82 - topm)/(vhm*0.5));
-      const nm=Math.round(pm*tchars.length);
-      tchars.forEach((s,i)=>s.classList.toggle('lit', i<nm));
       return;
     }
     const vh=innerHeight||document.documentElement.clientHeight;
@@ -408,9 +403,7 @@ if(solStage&&solScene){
     const scrolled=-solStage.getBoundingClientRect().top;
     const len=Math.max(1,solStage.offsetHeight-vh);
     const t=clS(scrolled/len);
-    // 1) escreve "Agora imagina..."
-    const nlit=Math.round(clS((t-0.03)/0.27)*tchars.length);
-    tchars.forEach((s,i)=>s.classList.toggle('lit', i<nlit));
+    // 1) título "Agora imagina..." agora anima sozinho ao entrar (ver typeTitle abaixo)
     // 2) o círculo branco cresce e REVELA o vídeo (Bob aparece já ao virar branco)
     const maxR=Math.hypot(vw/2,vh)+48;
     setClip(easeS(clS((t-0.40)/0.42))*maxR);
@@ -422,6 +415,23 @@ if(solStage&&solScene){
   addEventListener('resize',updS,{passive:true});
   deskS.addEventListener('change',updS);
   updS();
+
+  // título "Agora imagina...": digita SOZINHO ao chegar na seção (independente da rolagem)
+  let titleTyped=false;
+  function typeTitle(){
+    if(titleTyped) return; titleTyped=true;
+    const n=tchars.length||1;
+    const per=Math.max(16,Math.min(40,820/n));   // ~0.8s no total, seja qual for o nº de letras
+    tchars.forEach((s,i)=>setTimeout(()=>s.classList.add('lit'),Math.round(i*per)));
+  }
+  if(!redS && solTitle){
+    if('IntersectionObserver' in window){
+      const tio=new IntersectionObserver(es=>{es.forEach(e=>{
+        if(e.isIntersecting){ typeTitle(); tio.disconnect(); }
+      });},{threshold:0,rootMargin:'-25% 0px -25% 0px'});   // dispara quando entra no miolo da tela
+      tio.observe(solTitle);
+    } else { typeTitle(); }
+  }
 }
 
 
@@ -1297,6 +1307,31 @@ if(solStage&&solScene){
     if(e.isIntersecting){ load(e.target.__vid); obs.unobserve(e.target); }
   });},{rootMargin:'600px 0px'});   // começa a baixar ~600px antes da seção aparecer
   vids.forEach(v=>{ const anchor=v.closest('section')||v.parentElement; anchor.__vid=v; io.observe(anchor); });
+})();
+
+/* ===== FAQ: acordeão (abre um, fecha os outros; altura animada) ===== */
+(function(){
+  const items=[...document.querySelectorAll('.faq-item')];
+  if(!items.length) return;
+  const setOpen=(it,open)=>{
+    const btn=it.querySelector('.faq-q');
+    const panel=it.querySelector('.faq-a');
+    btn.setAttribute('aria-expanded', open?'true':'false');
+    panel.style.maxHeight = open ? (panel.querySelector('.faq-a-in').offsetHeight+'px') : '0px';
+  };
+  items.forEach(it=>{
+    const btn=it.querySelector('.faq-q');
+    btn.addEventListener('click',()=>{
+      const isOpen=btn.getAttribute('aria-expanded')==='true';
+      items.forEach(o=>{ if(o!==it) setOpen(o,false); });   // fecha os demais
+      setOpen(it,!isOpen);
+    });
+  });
+  // reajusta a altura do item aberto se a tela mudar de largura (reflow do texto)
+  addEventListener('resize',()=>{
+    const open=items.find(it=>it.querySelector('.faq-q').getAttribute('aria-expanded')==='true');
+    if(open) open.querySelector('.faq-a').style.maxHeight = open.querySelector('.faq-a-in').offsetHeight+'px';
+  },{passive:true});
 })();
 
 /* ===== Menu mobile (drawer preto) ===== */

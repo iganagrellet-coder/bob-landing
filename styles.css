@@ -132,18 +132,17 @@ h2{font-size:clamp(38px,5.6vw,68px)}
   box-shadow:-24px 0 60px -20px rgba(0,0,0,.5)
 }
 .mmenu.open .mmenu-panel{transform:none}
-.mmenu-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.mmenu-brand{height:30px;width:auto;filter:brightness(0) invert(1)}
+.mmenu-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:20px}
 .mmenu-close{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);border:none;border-radius:12px;color:#fff;cursor:pointer}
 .mmenu-close svg{width:20px;height:20px}
 .mmenu-close:hover{background:rgba(255,255,255,.16)}
 .mmenu-links{display:flex;flex-direction:column;gap:2px;margin-bottom:auto}
 .mmenu-links a{
   font-size:19px;font-weight:600;color:rgba(255,255,255,.92);
-  padding:15px 8px;border-radius:12px;letter-spacing:-.01em;
-  transition:background .2s var(--ease),padding-left .2s var(--ease)
+  padding:15px 8px;border-radius:12px;letter-spacing:-.01em;text-align:right;
+  transition:background .2s var(--ease),padding-right .2s var(--ease)
 }
-.mmenu-links a:hover{background:rgba(255,255,255,.07);padding-left:14px}
+.mmenu-links a:hover{background:rgba(255,255,255,.07);padding-right:14px}
 .mmenu-actions{display:flex;flex-direction:column;gap:10px;padding-top:18px;border-top:1px solid rgba(255,255,255,.12)}
 .mmenu-login,.mmenu-cta{display:block;text-align:center;padding:15px;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:-.01em}
 .mmenu-login{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.35);transition:border-color .2s,background .2s}
@@ -1135,4 +1134,32 @@ body.menu-open{overflow:hidden}
 @media(max-width:720px){
   .sec-points{grid-template-columns:1fr;gap:26px;max-width:420px}
   .vault-row{grid-template-columns:78px 1fr 18px;gap:10px}
+}
+
+/* ---------- FAQ (acordeão) ---------- */
+.faq-list{max-width:760px;margin:clamp(32px,4vw,48px) auto 0}
+.faq-item{border-top:1px solid var(--line)}
+.faq-item:last-child{border-bottom:1px solid var(--line)}
+.faq-q{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:24px;
+  background:none;border:none;cursor:pointer;text-align:left;
+  padding:30px 4px;font-size:clamp(16px,2vw,18px);font-weight:600;
+  color:var(--ink);letter-spacing:-.01em;font-family:inherit
+}
+.faq-q:hover{color:var(--ink-soft)}
+.faq-ic{position:relative;flex:0 0 auto;width:18px;height:18px}
+.faq-ic::before,.faq-ic::after{content:'';position:absolute;background:var(--ink);border-radius:2px;transition:transform .3s var(--ease),opacity .3s var(--ease)}
+.faq-ic::before{top:8px;left:0;width:18px;height:2px}                 /* barra horizontal */
+.faq-ic::after{left:8px;top:0;width:2px;height:18px}                  /* barra vertical  */
+.faq-q[aria-expanded="true"] .faq-ic::after{transform:scaleY(0)}      /* + vira −        */
+.faq-q[aria-expanded="true"] .faq-ic{opacity:.55}
+.faq-a{overflow:hidden;max-height:0;transition:max-height .38s var(--ease)}
+.faq-a-in{padding:0 4px}
+.faq-a-in p{margin:-6px 0 32px;padding-right:56px;font-size:15px;line-height:1.72;color:var(--gray);text-align:left}
+.faq-more{text-align:center;margin:clamp(30px,4vw,44px) 0 0;font-size:15px;color:var(--gray)}
+.faq-more a{color:var(--ink);font-weight:600;border-bottom:1px solid var(--line);transition:border-color .2s var(--ease)}
+.faq-more a:hover{border-color:var(--ink)}
+@media(max-width:520px){
+  .faq-q{padding:20px 2px;gap:16px}
+  .faq-a-in p{padding-right:0}
 }
